@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1F5FA8">
+<meta name="robots" content="noindex">
+</head>
+<body>
+<title>Parking QR-check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one-column phone tool — status strip, scanner, manual entry, scan log. Signage-inspired. */
+:root {
+  --bg: #EEF1F4;
+  --surface: #FFFFFF;
+  --line: #D5DCE3;
+  --fg: #12202E;
+  --muted: #536273;
+  --accent: #1F5FA8;
+  --accent-ink: #FFFFFF;
+  --ok: #157A3A;
+  --used: #B54708;
+  --bad: #B3261E;
+  --chip: #E3EBF4;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E151C; --surface: #17212B; --line: #2A3845; --fg: #E8EEF3; --muted: #9AABBB;
+    --accent: #5B9BE0; --accent-ink: #0B1824; --chip: #1E2E3E; --ok: #4CC27A; --used: #F2A35E; --bad: #F2766E; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E151C; --surface: #17212B; --line: #2A3845; --fg: #E8EEF3; --muted: #9AABBB;
+  --accent: #5B9BE0; --accent-ink: #0B1824; --chip: #1E2E3E; --ok: #4CC27A; --used: #F2A35E; --bad: #F2766E; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.45; }
+.wrap { max-width: 520px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+h1, h2 { font-family: var(--font-display); margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.top .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; }
+.top h1 { font-size: 30px; line-height: 1.05; font-weight: 800; }
+.top .loc { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; font-weight: 600; }
+.loc .p { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 5px; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-weight: 800; font-size: 17px; }
+.count { text-align: right; }
+.count .n { font-family: var(--font-display); font-size: 34px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.count .n small { font-size: 18px; color: var(--muted); font-weight: 700; }
+.count .l { font-size: 13px; color: var(--muted); }
+.bar { height: 6px; border-radius: 3px; background: var(--chip); overflow: hidden; }
+.bar > div { height: 100%; background: var(--ok); width: 0; transition: width .3s ease; }
+
+.scanner { background: #0B1219; border-radius: 18px; overflow: hidden; position: relative; aspect-ratio: 4 / 3.4; max-width: 100%; display: grid; place-items: center; }
+.scanner video { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+.finder { position: relative; width: 58%; aspect-ratio: 1; pointer-events: none; }
+.finder i { position: absolute; width: 30px; height: 30px; border: 4px solid #FFFFFF; }
+.finder i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; border-radius: 8px 0 0 0; }
+.finder i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; border-radius: 0 8px 0 0; }
+.finder i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 8px; }
+.finder i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; border-radius: 0 0 8px 0; }
+.finder .laser { position: absolute; left: 8%; right: 8%; top: 50%; height: 3px; border-radius: 2px; background: #5BB4F0; animation: sweep 2s ease-in-out infinite alternate; }
+@keyframes sweep { from { top: 12%; } to { top: 86%; } }
+.idle { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #C9D4DE; text-align: center; padding: 20px; }
+.idle p { margin: 0; max-width: 30ch; font-size: 15px; }
+.scanner .live-tag { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,.55); color: #FFFFFF; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; display: flex; gap: 6px; align-items: center; }
+.live-tag::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #E5484D; }
+
+.actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+button, .btn { font: inherit; font-weight: 600; min-height: 52px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; font-size: 16px; }
+button.primary, .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+button:focus-visible, .btn:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .5; cursor: default; }
+.btn input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.btn { position: relative; }
+.actions .full { grid-column: 1 / -1; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.card h2 { font-size: 20px; font-weight: 700; }
+.manual { display: flex; gap: 8px; }
+.manual input { flex: 1 1 auto; min-width: 0; font: inherit; font-family: var(--font-mono); font-size: 16px; text-transform: uppercase; min-height: 52px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); padding: 0 14px; }
+.hint { font-size: 14px; color: var(--muted); margin: 0; }
+.msg { font-size: 14px; padding: 10px 12px; border-radius: 10px; background: var(--chip); }
+
+.log-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.log li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.log li:first-child { border-top: 0; }
+.log .dot { width: 10px; height: 10px; border-radius: 50%; }
+.log .code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log .res { font-weight: 600; font-size: 13px; text-align: right; }
+.empty { color: var(--muted); font-size: 14px; margin: 0; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.tools button { min-height: 44px; font-size: 15px; flex: 1 1 140px; }
+button.danger { color: var(--bad); }
+.confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--bad); }
+.confirm p { margin: 0; flex: 1 1 200px; font-size: 14px; }
+.confirm button { min-height: 44px; }
+.confirm .yes { background: #B3261E; color: #FFFFFF; border-color: transparent; }
+
+/* Result overlay — fixed colors, same in both themes: it must read from arm's length in daylight. */
+.result { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: calc(24px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px)); color: #FFFFFF; text-align: center; }
+.result.ok { background: #157A3A; }
+.result.used { background: #B54708; }
+.result.unknown, .result.wrong { background: #B3261E; }
+.result .icon { width: 120px; height: 120px; border-radius: 50%; background: #FFFFFF; display: grid; place-items: center; }
+.result .big { font-family: var(--font-display); font-size: 64px; font-weight: 800; line-height: 1; }
+.result .detail { font-size: 20px; max-width: 24ch; }
+.result .code { font-family: var(--font-mono); font-size: 16px; background: rgba(0,0,0,.22); padding: 6px 12px; border-radius: 8px; word-break: break-all; }
+.result button { margin-top: 12px; min-width: 220px; background: #FFFFFF; color: #12202E; border: 0; font-size: 18px; min-height: 56px; }
+.result .auto { font-size: 13px; opacity: .85; }
+
+.stack { display: flex; flex-direction: column; gap: 16px; }
+button.loc { min-height: 44px; margin-top: 6px; padding: 4px 12px 4px 6px; border-radius: 10px; font-size: 17px; }
+.loc .switch { font-size: 13px; color: var(--accent); font-weight: 600; margin-left: 4px; }
+.plist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 380px) { .plist { grid-template-columns: minmax(0, 1fr); } }
+.plist button { min-height: 72px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; text-align: left; padding: 10px 14px; }
+.plist button .pn { font-family: var(--font-display); font-size: 22px; font-weight: 800; line-height: 1.1; }
+.plist button .pc { font-size: 13px; color: var(--muted); font-weight: 500; }
+.plist button.current { border: 2px solid var(--accent); }
+@media (prefers-reduced-motion: reduce) { .finder .laser { animation: none; } .bar > div { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Parking QR-check</div>
+      <h1 id="evName">Event</h1>
+      <button type="button" class="loc" id="btnSwitch" hidden><span class="p" aria-hidden="true">P</span><span id="evLoc">Locatie</span><span class="switch">Wissel</span></button>
+    </div>
+    <div class="count" id="countBox" aria-live="polite" hidden>
+      <div class="n"><span id="cIn">0</span> <small>/ <span id="cTot">0</span></small></div>
+      <div class="l">binnen gelaten</div>
+    </div>
+  </header>
+  <div class="bar" id="barBox" aria-hidden="true" hidden><div id="bar"></div></div>
+  <div class="msg" id="msg" role="status" hidden></div>
+
+  <section class="card" id="picker" hidden aria-labelledby="pickH">
+    <h2 id="pickH">Op welke parking sta je?</h2>
+    <p class="hint">Je scant enkel codes voor deze parking. Je kan later nog wisselen.</p>
+    <div class="plist" id="pList"></div>
+  </section>
+
+  <div class="stack" id="app" hidden>
+
+  <section class="scanner" aria-label="Camera">
+    <video id="video" playsinline muted hidden></video>
+    <div class="live-tag" id="liveTag" hidden>Camera aan</div>
+    <div class="finder" id="finder" hidden><i></i><i></i><i></i><i></i><div class="laser"></div></div>
+    <div class="idle" id="idle">
+      <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><rect x="7" y="7" width="4" height="4"></rect><rect x="13" y="13" width="4" height="4"></rect><path d="M13 7h4v2"></path><path d="M7 15v2h2"></path></svg>
+      <p id="idleText">Start de camera en richt op de QR-code van de bezoeker.</p>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button type="button" class="primary" id="btnLive">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 8-6 4 6 4V8Z"></path><rect x="2" y="6" width="14" height="12" rx="2"></rect></svg>
+      <span id="btnLiveText">Start camera</span>
+    </button>
+    <label class="btn" id="btnPhoto">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+      <span>Foto van QR</span>
+      <input type="file" id="photo" accept="image/*" capture="environment">
+    </label>
+  </div>
+
+  <section class="card" aria-labelledby="manH">
+    <h2 id="manH">Code manueel ingeven</h2>
+    <form class="manual" id="manForm" autocomplete="off">
+      <label for="manCode" class="hint" hidden>Reservatiecode</label>
+      <input id="manCode" placeholder="bv. AGF27-P1-4K7Q2M" inputmode="text" autocapitalize="characters" spellcheck="false" aria-label="Reservatiecode">
+      <button type="submit" class="primary">Controleer</button>
+    </form>
+    <p class="hint">Voor een gekreukte print of een gsm met gebarsten scherm.</p>
+  </section>
+
+  <section class="card" aria-labelledby="logH">
+    <div class="log-head">
+      <h2 id="logH">Scanlog</h2>
+      <span class="hint mono" id="logCount"></span>
+    </div>
+    <ul class="log" id="log"></ul>
+    <p class="empty" id="logEmpty">Nog geen scans op dit toestel.</p>
+    <div class="tools">
+      <button type="button" id="btnExport">Exporteer log (CSV)</button>
+      <button type="button" id="btnCopy">Kopieer log</button>
+      <button type="button" class="danger" id="btnReset">Alles wissen</button>
+    </div>
+    <div class="confirm" id="confirm" hidden>
+      <p>Alle scans op dit toestel wissen? Gebruikte codes worden dan weer geldig.</p>
+      <button type="button" id="noReset">Annuleer</button>
+      <button type="button" class="yes" id="yesReset">Wis alles</button>
+    </div>
+    <p class="hint">Scans blijven bewaard op dit toestel, ook na herladen. Exporteer de log na het event.</p>
+  </section>
+  </div>
+</div>
+
+<div class="result" id="result" hidden role="alertdialog" aria-live="assertive" aria-labelledby="rBig">
+  <div class="icon" id="rIcon"></div>
+  <div class="big" id="rBig"></div>
+  <div class="detail" id="rDetail"></div>
+  <div class="code" id="rCode"></div>
+  <button type="button" id="rNext">Volgende scan</button>
+  <div class="auto" id="rAuto"></div>
+</div>
+
+<canvas id="canvas" hidden></canvas>
+
+<script src="jsQR.min.js"></script>
+<script>
+// The event comes from events/<id>.json, chosen with ?e=<id> in the link.
+// That file holds one hash list per parking (PBKDF2), never the codes themselves.
+// The steward picks a parking; scans and log are kept per event + parking on this device.
+const norm = s => String(s || "").trim().toUpperCase();
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const EVENT_ID = (params.get("e") || location.hash.slice(1) || "demo").replace(/[^a-z0-9_-]/gi, "");
+
+let EVENT = { id: EVENT_ID, naam: "Laden…", locatie: "", iter: 0 };
+let PARKINGS = [];          // [{ id, naam, size }]
+let OWNER = new Map();      // hash -> parking id
+let PARKING = null;         // current parking id
+let VALID = new Set();      // hashes for the current parking
+let KEY = "";
+let ready = false;
+let state = { used: {}, log: [] };
+let saltBytes = null, hashKeyLen = 16;
+
+const enc = new TextEncoder();
+const hex = buf => Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, "0")).join("");
+async function hashCode(code) {
+  const key = await crypto.subtle.importKey("raw", enc.encode(code), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations: EVENT.iter }, key, hashKeyLen * 8);
+  return hex(bits);
+}
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
+const parkingName = pid => (PARKINGS.find(p => p.id === pid) || {}).naam || pid;
+
+async function loadEvent() {
+  if (!window.crypto || !crypto.subtle) {
+    showMsg("Deze pagina moet via https geopend worden (beveiligde verbinding). Open de link opnieuw.");
+    EVENT.naam = "Niet beschikbaar"; render(); return;
+  }
+  try {
+    const res = await fetch("events/" + EVENT_ID + ".json", { cache: "no-cache" });
+    if (!res.ok) throw new Error(res.status);
+    const ev = await res.json();
+    EVENT = { id: ev.id, naam: ev.naam, locatie: "", iter: ev.iter };
+    saltBytes = enc.encode(ev.salt);
+    hashKeyLen = ev.len || 16;
+    PARKINGS = ev.parkings.map(p => ({ id: p.id, naam: p.naam, size: p.hashes.length }));
+    ev.parkings.forEach(p => p.hashes.forEach(h => OWNER.set(h, p.id)));
+    window.__parkingHashes = Object.fromEntries(ev.parkings.map(p => [p.id, p.hashes]));
+  } catch (e) {
+    EVENT.naam = "Event niet gevonden";
+    showMsg("Geen codelijst gevonden voor ‘" + EVENT_ID + "’. Controleer de link die je kreeg.");
+    render(); return;
+  }
+  const want = (params.get("p") || lsGet("qrcheck:" + EVENT.id + ":parking") || "").toLowerCase();
+  if (PARKINGS.length === 1) selectParking(PARKINGS[0].id);
+  else if (PARKINGS.some(p => p.id === want)) selectParking(want);
+  else showPicker();
+}
+
+function showPicker() {
+  stopLive && stream && stopLive();
+  const list = $("pList"); list.textContent = "";
+  PARKINGS.forEach(p => {
+    const b = document.createElement("button");
+    b.type = "button"; if (p.id === PARKING) b.className = "current";
+    const n = document.createElement("span"); n.className = "pn"; n.textContent = p.naam;
+    const c = document.createElement("span"); c.className = "pc";
+    let done = 0; try { done = Object.keys((JSON.parse(lsGet("qrcheck:" + EVENT.id + ":" + p.id) || "{}").used) || {}).length; } catch (e) {}
+    c.textContent = p.size + " reservaties" + (done ? " · " + done + " binnen" : "");
+    b.append(n, c);
+    b.addEventListener("click", () => selectParking(p.id));
+    list.append(b);
+  });
+  $("picker").hidden = false; $("app").hidden = true; $("btnSwitch").hidden = true;
+  $("countBox").hidden = true; $("barBox").hidden = true;
+  $("evName").textContent = EVENT.naam;
+  ready = false;
+}
+
+function selectParking(pid) {
+  PARKING = pid;
+  VALID = new Set(window.__parkingHashes[pid]);
+  EVENT.locatie = parkingName(pid);
+  KEY = "qrcheck:" + EVENT.id + ":" + pid;
+  lsSet("qrcheck:" + EVENT.id + ":parking", pid);
+  state = { used: {}, log: [] };
+  try { const s = JSON.parse(lsGet(KEY) || "null"); if (s && s.used && s.log) state = s; } catch (e) {}
+  $("picker").hidden = true; $("app").hidden = false;
+  $("countBox").hidden = false; $("barBox").hidden = false;
+  $("btnSwitch").hidden = PARKINGS.length < 2;
+  ready = true; hideMsg();
+  render();
+}
+$("btnSwitch").addEventListener("click", showPicker);
+
+let storageOk = true;
+function save() {
+  if (lsSet(KEY, JSON.stringify(state))) storageOk = true;
+  else { storageOk = false; showMsg("Let op: dit toestel bewaart de scans niet (privé-venster?). Gebruik een gewoon browservenster."); }
+}
+
+const fmtTime = iso => new Date(iso).toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+// A QR may hold a bare code or a URL: try the raw value, then ?code= and the last path part.
+// Returns { code, pid }: pid is the parking the code belongs to, or null when unknown.
+async function resolve(raw) {
+  const s = String(raw).trim(), r = norm(s);
+  const cands = [r];
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      const u = new URL(s);
+      const q = u.searchParams.get("code") || u.searchParams.get("c");
+      if (q) cands.push(norm(q));
+      const last = u.pathname.split("/").filter(Boolean).pop();
+      if (last) cands.push(norm(last));
+    } catch (e) {}
+  }
+  for (const c of cands) {
+    const pid = OWNER.get(await hashCode(c));
+    if (pid) return { code: c, pid };
+  }
+  return { code: r, pid: null };
+}
+
+let checking = false;
+async function check(raw) {
+  if (!ready) { showMsg("Kies eerst je parking."); return; }
+  if (checking) return;
+  checking = true;
+  let code, pid;
+  try { ({ code, pid } = await resolve(raw)); } finally { checking = false; }
+  const now = new Date().toISOString();
+  let result;
+  if (!pid) result = "unknown";
+  else if (pid !== PARKING) result = "wrong";
+  else if (state.used[code]) result = "used";
+  else { result = "ok"; state.used[code] = now; }
+  state.log.unshift({ code, t: now, r: result, p: pid });
+  save();
+  render();
+  showResult(result, code, pid);
+}
+
+// ---------- result overlay ----------
+const ICONS = {
+  ok: '<svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#157A3A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>',
+  used: '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#B54708" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>',
+  wrong: '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#B3261E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg>',
+  unknown: '<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#B3261E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>',
+};
+let resultOpen = false, autoTimer = null, lastCode = "", lastAt = 0;
+function showResult(kind, code, pid) {
+  const r = $("result");
+  r.className = "result " + kind;
+  $("rIcon").innerHTML = ICONS[kind];
+  $("rBig").textContent = kind === "ok" ? "OK" : "Niet OK";
+  $("rDetail").textContent =
+    kind === "ok" ? "Geldige reservatie. Laat binnen." :
+    kind === "used" ? "Al gebruikt om " + fmtTime(state.used[code]) + "." :
+    kind === "wrong" ? "Verkeerde parking. Deze reservatie is voor " + parkingName(pid) + "." :
+    "Onbekende code. Niet geldig voor dit event.";
+  $("rCode").textContent = code || "(leeg)";
+  r.hidden = false; resultOpen = true;
+  feedback(kind);
+  clearInterval(autoTimer);
+  if (kind === "ok") {
+    let left = 3; $("rAuto").textContent = "Sluit vanzelf over " + left + " s";
+    autoTimer = setInterval(() => { left--; if (left <= 0) closeResult(); else $("rAuto").textContent = "Sluit vanzelf over " + left + " s"; }, 1000);
+  } else $("rAuto").textContent = "";
+  $("rNext").focus();
+}
+function closeResult() {
+  clearInterval(autoTimer);
+  $("result").hidden = true; resultOpen = false;
+  lastAt = Date.now();
+}
+$("rNext").addEventListener("click", closeResult);
+
+let audio = null;
+function feedback(kind) {
+  try { navigator.vibrate && navigator.vibrate(kind === "ok" ? 120 : [200, 100, 200, 100, 200]); } catch (e) {}
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const tones = kind === "ok" ? [[880, 0, .12]] : [[220, 0, .18], [220, .25, .18]];
+    tones.forEach(([f, start, dur]) => {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = f; o.type = kind === "ok" ? "sine" : "square";
+      g.gain.value = .12; o.connect(g); g.connect(audio.destination);
+      o.start(audio.currentTime + start); o.stop(audio.currentTime + start + dur);
+    });
+  } catch (e) {}
+}
+
+// ---------- decoding ----------
+const canvas = $("canvas"), ctx = canvas.getContext("2d", { willReadFrequently: true });
+let detector = null;
+try { if ("BarcodeDetector" in window) detector = new BarcodeDetector({ formats: ["qr_code"] }); } catch (e) { detector = null; }
+
+async function decode(source, w, h, maxSide) {
+  if (detector) {
+    try { const res = await detector.detect(source); if (res && res.length) return res[0].rawValue; } catch (e) {}
+  }
+  const scale = Math.min(1, maxSide / Math.max(w, h));
+  canvas.width = Math.round(w * scale); canvas.height = Math.round(h * scale);
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const hit = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+  return hit ? hit.data : null;
+}
+
+// ---------- live camera ----------
+const video = $("video");
+let stream = null, wake = null, looping = false;
+async function startLive() {
+  hideMsg();
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false });
+  } catch (e) {
+    showMsg("De live camera is hier niet beschikbaar. Gebruik ‘Foto van QR’: dat opent de camera van je gsm.");
+    $("btnLive").disabled = true;
+    return;
+  }
+  video.srcObject = stream; video.hidden = false;
+  await video.play().catch(() => {});
+  $("idle").hidden = true; $("finder").hidden = false; $("liveTag").hidden = false;
+  $("btnLiveText").textContent = "Stop camera";
+  try { wake = await navigator.wakeLock.request("screen"); } catch (e) {}
+  looping = true; loop();
+}
+function stopLive() {
+  looping = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; video.hidden = true; video.srcObject = null;
+  $("idle").hidden = false; $("finder").hidden = true; $("liveTag").hidden = true;
+  $("btnLiveText").textContent = "Start camera";
+  try { wake && wake.release(); } catch (e) {} wake = null;
+}
+async function loop() {
+  if (!looping) return;
+  if (!resultOpen && video.readyState >= 2 && video.videoWidth) {
+    const data = await decode(video, video.videoWidth, video.videoHeight, 720);
+    if (data) {
+      const n = norm(data);
+      // same code right after closing the result: ignore for 3 s, the visitor is still holding it up
+      if (!(n === lastCode && Date.now() - lastAt < 3000)) { lastCode = n; check(data); }
+    }
+  }
+  setTimeout(() => requestAnimationFrame(loop), 120);
+}
+$("btnLive").addEventListener("click", () => {
+  if (audio === null) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  stream ? stopLive() : startLive();
+});
+if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  $("btnLive").disabled = true;
+  $("idleText").textContent = "Tik op ‘Foto van QR’: de camera opent, neem een foto van de code.";
+}
+
+// ---------- photo fallback ----------
+$("photo").addEventListener("change", async e => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  hideMsg();
+  try {
+    const bmp = await createImageBitmap(file);
+    let data = await decode(bmp, bmp.width, bmp.height, 1400);
+    if (!data && !detector) {
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const hit = jsQR(img.data, img.width, img.height, { inversionAttempts: "attemptBoth" });
+      data = hit ? hit.data : null;
+    }
+    if (data) check(data);
+    else showMsg("Geen QR-code gevonden op de foto. Kom dichterbij en hou de gsm stil, of geef de code manueel in.");
+  } catch (err) {
+    showMsg("Deze foto kon niet gelezen worden. Probeer opnieuw.");
+  }
+});
+
+// ---------- manual ----------
+$("manForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const v = $("manCode").value;
+  if (!norm(v)) { $("manCode").focus(); return; }
+  check(v); $("manCode").value = "";
+});
+
+// ---------- log + tools ----------
+const LABEL = { ok: "OK", used: "Al gebruikt", wrong: "Andere parking", unknown: "Onbekend" };
+const COLOR = { ok: "var(--ok)", used: "var(--used)", wrong: "var(--bad)", unknown: "var(--bad)" };
+function render() {
+  $("evName").textContent = EVENT.naam;
+  $("evLoc").textContent = EVENT.locatie;
+  const inCount = Object.keys(state.used).length;
+  $("cIn").textContent = inCount;
+  $("cTot").textContent = VALID.size;
+  $("bar").style.width = (VALID.size ? Math.min(100, inCount / VALID.size * 100) : 0) + "%";
+  const ul = $("log"); ul.textContent = "";
+  state.log.slice(0, 30).forEach(x => {
+    const li = document.createElement("li");
+    const dot = document.createElement("span"); dot.className = "dot"; dot.style.background = COLOR[x.r];
+    const code = document.createElement("span"); code.className = "code mono"; code.textContent = fmtTime(x.t) + "  " + x.code;
+    const res = document.createElement("span"); res.className = "res"; res.style.color = COLOR[x.r]; res.textContent = LABEL[x.r];
+    li.append(dot, code, res); ul.append(li);
+  });
+  $("logEmpty").hidden = state.log.length > 0;
+  $("logCount").textContent = state.log.length ? state.log.length + " scans" : "";
+}
+
+function csv() {
+  const rows = [["code", "tijdstip", "resultaat", "event", "parking", "parking van code"]];
+  state.log.slice().reverse().forEach(x => rows.push([x.code, x.t, LABEL[x.r], EVENT.naam, EVENT.locatie, x.p ? parkingName(x.p) : ""]));
+  return rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(";")).join("\r\n");
+}
+$("btnExport").addEventListener("click", async () => {
+  const name = "scanlog-" + EVENT.id + "-" + PARKING + "-" + new Date().toISOString().slice(0, 10) + ".csv";
+  const data = "﻿" + csv();
+  if (window.claude && window.claude.use) {
+    const dl = await window.claude.use("downloads");
+    if (dl) {
+      try { await dl.save({ filename: name, data }); showMsg("Log bewaard als " + name + "."); }
+      catch (e) { if (e && e.code !== "declined") showMsg("Exporteren lukt hier niet. Gebruik ‘Kopieer log’."); }
+      return;
+    }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([data], { type: "text/csv" }));
+  a.download = name; document.body.append(a); a.click(); a.remove();
+});
+$("btnCopy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(csv()); showMsg("Log gekopieerd. Plak hem in een mail of Excel."); }
+  catch (e) { showMsg("Kopiëren lukt niet op dit toestel. Gebruik ‘Exporteer log’."); }
+});
+$("btnReset").addEventListener("click", () => { $("confirm").hidden = false; $("noReset").focus(); });
+$("noReset").addEventListener("click", () => { $("confirm").hidden = true; });
+$("yesReset").addEventListener("click", () => {
+  state = { used: {}, log: [] }; save(); render();
+  $("confirm").hidden = true; showMsg("Alle scans gewist.");
+});
+
+function showMsg(t) { const m = $("msg"); m.textContent = t; m.hidden = false; }
+function hideMsg() { $("msg").hidden = true; }
+
+render();
+loadEvent();
+</script>
+
+</body>
+</html>
