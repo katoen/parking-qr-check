@@ -54,7 +54,7 @@ h1, h2 { font-family: var(--font-display); margin: 0; letter-spacing: 0.01em; te
 .count .n small { font-size: 18px; color: var(--muted); font-weight: 700; }
 .count .l { font-size: 13px; color: var(--muted); }
 .bar { height: 6px; border-radius: 3px; background: var(--chip); overflow: hidden; }
-.bar > div { height: 100%; background: var(--ok); width: 0; transition: width .3s ease; }
+.bar > div { height: 100%; background: var(--ok); width: 100%; transform: scaleX(0); transform-origin: left; transition: transform .3s ease; }
 
 .scanner { background: #0B1219; border-radius: 18px; overflow: hidden; position: relative; aspect-ratio: 4 / 3.4; max-width: 100%; display: grid; place-items: center; }
 .scanner video { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
@@ -130,7 +130,6 @@ button.loc { min-height: 44px; margin-top: 6px; padding: 4px 12px 4px 6px; borde
 <div class="wrap">
   <header class="top">
     <div>
-      <div class="eyebrow">Parking QR-check</div>
       <h1 id="evName">Event</h1>
       <button type="button" class="loc" id="btnSwitch" hidden><span class="p" aria-hidden="true">P</span><span id="evLoc">Locatie</span><span class="switch">Wissel</span></button>
     </div>
@@ -509,7 +508,7 @@ function render() {
   const inCount = Object.keys(state.used).length;
   $("cIn").textContent = inCount;
   $("cTot").textContent = VALID.size;
-  $("bar").style.width = (VALID.size ? Math.min(100, inCount / VALID.size * 100) : 0) + "%";
+  $("bar").style.transform = "scaleX(" + (VALID.size ? Math.min(1, inCount / VALID.size) : 0) + ")";
   const ul = $("log"); ul.textContent = "";
   state.log.slice(0, 30).forEach(x => {
     const li = document.createElement("li");
