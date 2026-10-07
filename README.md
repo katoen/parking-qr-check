@@ -3,7 +3,7 @@
 Scantool voor stewards aan de inrit van een parking. De steward kiest zijn parking en scant de QR-code van de reservatie. De tool zegt meteen **OK**, **al gebruikt**, **verkeerde parking** of **onbekend**. Elke scan wordt bewaard op het toestel.
 
 - Scantool: `https://katoen.github.io/parking-qr-check/?e=<event>`
-- Demo: `https://katoen.github.io/parking-qr-check/?e=demo` (met `testcodes.png` om te scannen)
+- Demo: `https://katoen.github.io/parking-qr-check/?e=demo` (testcodes per parking in `testcodes/`)
 - Codelijst maken: `https://katoen.github.io/parking-qr-check/maak-lijst.html`
 
 ## Werkwijze per event
@@ -26,6 +26,6 @@ Een rechtstreekse link per parking kan ook: `…/?e=<event>&p=<parking-id>`. De 
 - Eén steward per parking. Twee toestellen op dezelfde parking weten niet van elkaars scans.
 - Browsergegevens wissen of een privévenster gebruiken = log kwijt. Exporteer de log na het event.
 - De hashing beschermt de lijst zolang de codes zelf lang en willekeurig zijn. Korte, voorspelbare codes zijn met genoeg rekenkracht te raden.
-- `voorbeeld-export.csv` en `testcodes.png` horen bij het demo-event en zijn bewust publiek.
+- `voorbeeld-export.csv`, `testcodes.png` en `testcodes/` horen bij het demo-event en zijn bewust publiek.
 
 Gebruikt [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0) als QR-lezer wanneer de browser er zelf geen heeft.
