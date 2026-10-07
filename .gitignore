@@ -1,0 +1,6 @@
+# Echte exports uit het reservatieplatform bevatten leesbare codes: nooit committen.
+*.csv
+*.xlsx
+*.xls
+# Uitzondering: de demo-export hoort bij het publieke demo-event.
+!voorbeeld-export.csv
